@@ -1,4 +1,4 @@
-import json, time
+import json, os, time
 from twisted.internet import reactor
 from twisted.python import usage, log
 from twisted.application.service import MultiService
@@ -23,7 +23,8 @@ class Options(usage.Options):
     optParameters = [
         ("port", "p", r"tcp:4000:interface=\:\:", "endpoint to listen on"),
         ("blur-usage", None, None, "round logged access times to improve privacy"),
-        ("channel-db", None, "relay.sqlite", "location for the state database"),
+        ("channel-db", None, None,
+         "location for the state database (default: relay.sqlite)"),
         ("usage-db", None, None, "record usage data (SQLite)"),
         ("addrid-db", None, None, "IP address mapping data (SQLite)"),
         ("replica-id-file", None, "replica.id",
@@ -82,14 +83,19 @@ def makeService(config, channel_db="relay.sqlite", reactor=reactor):
 
     parent = MultiService()
 
-    channel_db = create_or_upgrade_channel_db(config["channel-db"])
+    channel_dbfile = (config["channel-db"]
+                      or os.environ.get("WORMHOLE_CHANNEL_DB")
+                      or channel_db)
+    channel_db = create_or_upgrade_channel_db(channel_dbfile)
     replica_id = load_or_create_replica_id(config["replica-id-file"])
-    usage_dbfile = config["usage-db"]
+    usage_dbfile = (config["usage-db"]
+                    or os.environ.get("WORMHOLE_USAGE_DB"))
     usage_db = (create_or_upgrade_usage_db(usage_dbfile, replica_id)
                 if usage_dbfile else None)
     if usage_db:
         usage_db.register_replica()
-    addrid_dbfile = config["addrid-db"]
+    addrid_dbfile = (config["addrid-db"]
+                     or os.environ.get("WORMHOLE_ADDRID_DB"))
     addrid_db = create_or_upgrade_addrid_db(addrid_dbfile) if addrid_dbfile else None
     generation_duration = config["generation-duration"]
 

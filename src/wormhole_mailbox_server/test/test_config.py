@@ -9,7 +9,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions([])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -28,7 +28,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--advertise-version=1.0"])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": "1.0",
@@ -47,7 +47,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--blur-usage=60"])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -85,7 +85,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--disallow-list"])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": False,
                              "advertise-version": None,
@@ -104,7 +104,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["-p", "tcp:5555"])
         self.assertEqual(o, {"port": "tcp:5555",
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -122,7 +122,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--port=tcp:5555"])
         self.assertEqual(o, {"port": "tcp:5555",
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -141,7 +141,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--signal-error=ohnoes"])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -160,7 +160,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--usage-db=usage.sqlite"])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -179,7 +179,7 @@ class Config(unittest.TestCase):
         o = server_tap.Options()
         o.parseOptions(["--websocket-protocol-option", 'foo="bar"'])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,
@@ -200,7 +200,7 @@ class Config(unittest.TestCase):
                         "--websocket-protocol-option", 'baz=[1,"buz"]',
                         ])
         self.assertEqual(o, {"port": PORT,
-                             "channel-db": "relay.sqlite",
+                             "channel-db": None,
                              "disallow-list": 0,
                              "allow-list": True,
                              "advertise-version": None,

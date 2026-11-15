@@ -17,7 +17,9 @@ FROM python:${PYTHON_VERSION}-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    WORMHOLE_CHANNEL_DB=/data/relay.sqlite \
+    WORMHOLE_USAGE_DB=/data/usage.sqlite
 
 # Run as an unprivileged user and keep all mutable state in /data.
 RUN groupadd --system --gid 10001 wormhole \
@@ -53,6 +55,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 # `twist` is Twisted's application runner; it installs SIGTERM/SIGINT
 # handlers and runs in the foreground, so it is the correct PID 1 here.
 ENTRYPOINT ["twist", "wormhole-mailbox"]
-CMD ["--channel-db=/data/relay.sqlite", \
-     "--usage-db=/data/usage.sqlite", \
-     "--port=tcp:4000"]
+CMD ["--port=tcp:4000"]

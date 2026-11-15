@@ -98,26 +98,33 @@ docker run -d --name wormhole-mailbox \
   magic-wormhole-mailbox
 ```
 
-The container entrypoint is `twist wormhole-mailbox`; its default arguments
-are:
+The container entrypoint is `twist wormhole-mailbox`. Database locations come
+from environment variables with these built-in defaults:
 
 ```
---channel-db=/data/relay.sqlite
---usage-db=/data/usage.sqlite
+WORMHOLE_CHANNEL_DB=/data/relay.sqlite
+WORMHOLE_USAGE_DB=/data/usage.sqlite
+```
+
+Its only default argument is:
+
+```
 --port=tcp:4000
 ```
 
-Override any of them by appending arguments after the image name. For
-example, to disable the usage database and add IP-address tracking:
+Override the port by appending arguments after the image name. Override or
+disable databases with `-e`; an empty `WORMHOLE_USAGE_DB` or
+`WORMHOLE_ADDRID_DB` disables that database. For example, to disable usage
+recording and add IP-address tracking:
 
 ```shell
 docker run -d --name wormhole-mailbox \
   -p 4000:4000 \
   -v wormhole-mailbox-data:/data \
-  magic-wormhole-mailbox \
-  --channel-db=/data/relay.sqlite \
-  --addrid-db=/data/addrid.sqlite \
-  --port=tcp:4000
+  -e WORMHOLE_CHANNEL_DB=/data/relay.sqlite \
+  -e WORMHOLE_USAGE_DB= \
+  -e WORMHOLE_ADDRID_DB=/data/addrid.sqlite \
+  magic-wormhole-mailbox
 ```
 
 The image exposes port `4000` and includes a TCP healthcheck. Client
@@ -127,12 +134,32 @@ commands point at the mapped port:
 wormhole --relay-url=ws://localhost:4000/v1 send FILENAME
 ```
 
+## Kubernetes (Helm)
+
+`misc/helm/wormhole-mailbox` packages the server as a StatefulSet for
+horizontally scaled deployments. It bundles PostgreSQL, keeps a persistent
+`replica.id` per pod, and includes an HPA, PodDisruptionBudget, and an Ingress
+example. See the [chart README](misc/helm/wormhole-mailbox/README.md).
+
+```shell
+helm dependency build misc/helm/wormhole-mailbox
+helm install my-relay misc/helm/wormhole-mailbox \
+  --namespace wormhole --create-namespace \
+  --set image.repository=registry.example.com/magic-wormhole-mailbox \
+  --set image.tag=0.8.0 \
+  --set ingress.hosts[0].host=mailbox.example.com
+```
+
 ## Database backends and migrations
 
 SQLite remains the default: `--channel-db` accepts a filename (or
 `:memory:`), and `--usage-db` / `--addrid-db` are optional SQLite files.
 The three databases can also be pointed at any SQLAlchemy URL containing
-`://` (for example `postgresql://user:pass@host/dbname`).
+`://` (for example `postgresql://user:pass@host/dbname`). The
+`WORMHOLE_CHANNEL_DB`, `WORMHOLE_USAGE_DB`, and `WORMHOLE_ADDRID_DB`
+environment variables are used when the corresponding command-line option is
+not supplied, which lets deployments keep credentials out of the process
+argument list.
 
 Schema changes are applied with Alembic at startup. Migration execution is
 serialized per database (advisory locks on PostgreSQL/MySQL, a lock file
