@@ -1,0 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "wormhole-mailbox.fullname" . }}-entrypoint
+  labels:
+    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+data:
+  entrypoint.sh: |
+    #!/bin/sh
+    set -eu
+
+    # Percent-encode credentials so arbitrary passwords are safe in a
+    # SQLAlchemy URL. Python is present in the runtime image.
+    quote() {
+      python -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=""))' "$1"
+    }
+
+    db_base="${DB_SCHEME}://$(quote "${DB_USER}"):$(quote "${DB_PASSWORD}")@${DB_HOST}:${DB_PORT}"
+    db_suffix=""
+    if [ -n "${DB_SSLMODE:-}" ]; then
+      db_suffix="?sslmode=$(quote "${DB_SSLMODE}")"
+    fi
+
+    channel_db="${db_base}/${DB_CHANNEL_NAME}${db_suffix}"
+    usage_db="${db_base}/${DB_USAGE_NAME}${db_suffix}"
+    addrid_db="${db_base}/${DB_ADDRID_NAME}${db_suffix}"
+
+    # The server reads these from the environment. Keeping the URLs out of
+    # argv prevents credentials from showing up in the process list.
+    export WORMHOLE_CHANNEL_DB="${channel_db}"
+    if [ -n "${DB_USAGE_NAME:-}" ]; then
+      export WORMHOLE_USAGE_DB="${usage_db}"
+    else
+      # Override the image default so usage recording stays disabled.
+      export WORMHOLE_USAGE_DB=""
+    fi
+    if [ -n "${DB_ADDRID_NAME:-}" ]; then
+      export WORMHOLE_ADDRID_DB="${addrid_db}"
+    else
+      export WORMHOLE_ADDRID_DB=""
+    fi
+    unset DB_PASSWORD
+
+    set -- twist wormhole-mailbox \
+      --port="${LISTEN_ENDPOINT}" \
+      --replica-id-file="${REPLICA_ID_FILE}"
+
+    if [ -n "${PUBSUB:-}" ]; then
+      set -- "$@" --pubsub="${PUBSUB}"
+    fi
+    if [ "${ALLOW_LIST:-true}" != "true" ]; then
+      set -- "$@" --disallow-list
+    fi
+    if [ -n "${BLUR_USAGE:-}" ]; then
+      set -- "$@" --blur-usage="${BLUR_USAGE}"
+    fi
+    if [ -n "${GENERATION_DURATION:-}" ]; then
+      set -- "$@" --generation-duration="${GENERATION_DURATION}"
+    fi
+    if [ -n "${ADVERTISE_VERSION:-}" ]; then
+      set -- "$@" --advertise-version="${ADVERTISE_VERSION}"
+    fi
+    if [ -n "${SIGNAL_ERROR:-}" ]; then
+      set -- "$@" --signal-error="${SIGNAL_ERROR}"
+    fi
+    if [ -n "${MOTD:-}" ]; then
+      set -- "$@" --motd="${MOTD}"
+    fi
+    if [ -n "${WEBSOCKET_PROTOCOL_OPTIONS:-}" ]; then
+      old_ifs="$IFS"
+      IFS='
+    '
+      for option in ${WEBSOCKET_PROTOCOL_OPTIONS}; do
+        [ -n "${option}" ] || continue
+        set -- "$@" "--websocket-protocol-option=${option}"
+      done
+      IFS="$old_ifs"
+    fi
+{{- range .Values.config.extraArgs }}
+    set -- "$@" {{ . | quote }}
+{{- end }}
+
+    exec "$@"

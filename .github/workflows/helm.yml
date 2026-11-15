@@ -1,0 +1,34 @@
+name: Publish Helm chart
+
+on:
+  push:
+    tags:
+      - "chart-*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      - name: Log in to GHCR
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" |
+            helm registry login ghcr.io \
+              --username "${{ github.actor }}" \
+              --password-stdin
+
+      - name: Package and publish
+        env:
+          ORG: ${{ github.repository_owner }}
+        run: |
+          CHART=wormhole-mailbox
+          helm dependency build "./misc/charts/$CHART"
+          helm package "./misc/charts/$CHART"
+          helm push "$CHART"-*.tgz "oci://ghcr.io/${ORG}/charts"

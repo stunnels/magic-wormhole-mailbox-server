@@ -1,0 +1,279 @@
+# Default values for the wormhole-mailbox chart.
+#
+# The chart is production-shaped: it runs three replicas behind an HPA, keeps a
+# PersistentVolume per pod for the server's persistent replica.id, and bundles
+# PostgreSQL (Bitnami subchart) for shared channel/usage/address-id state.
+# Every optional extra can be turned off from the section that controls it.
+
+# Number of replicas used when autoscaling.enabled is false.
+replicaCount: 3
+
+image:
+  # Build with: docker build -f misc/Dockerfile -t magic-wormhole-mailbox .
+  # Then push to your registry and override repository/tag.
+  repository: magic-wormhole-mailbox
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  # The server does not call the Kubernetes API.
+  automount: false
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+# Extra environment variables appended to the mailbox container.
+extraEnv: []
+
+podSecurityContext:
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 4000
+  annotations: {}
+  # Optional Service fields, for example:
+  # externalTrafficPolicy: Local
+  # loadBalancerIP: ""
+
+ingress:
+  # The default host is a placeholder. Point it at your relay hostname and
+  # make sure the ingress class below exists in the cluster.
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+  hosts:
+    - host: mailbox.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  # Example TLS entry:
+  # tls:
+  #   - secretName: mailbox-example-tls
+  #     hosts:
+  #       - mailbox.example.com
+
+# Gateway API (HTTPRoute). Requires the Gateway API CRDs and a Gateway
+# controller (for example NGINX Gateway Fabric, Envoy Gateway, or Istio) plus a
+# Gateway that the route can attach to. TLS is terminated by the Gateway
+# listener, not by this chart. Disable ingress.enabled when this is the only
+# external entry point.
+gatewayAPI:
+  enabled: false
+  # Extra labels/annotations for the HTTPRoute.
+  annotations: {}
+  labels: {}
+  # Gateways to attach to. At least one entry is required when enabled.
+  # namespace defaults to the HTTPRoute's namespace.
+  parentRefs:
+    - name: nginx-gateway
+      namespace: nginx-gateway
+      sectionName: https
+  # Must be covered by a listener on each parent Gateway. WebSocket clients use
+  # the same host, under /v1.
+  hostnames:
+    - mailbox.example.com
+  # Path match for the WebSocket relay.
+  path: /
+  pathType: PathPrefix
+  # Optional HTTPRoute rule filters, for example:
+  # filters:
+  #   - type: RequestHeaderModifier
+  #     requestHeaderModifier:
+  #       set:
+  #         - name: X-Forwarded-Proto
+  #           value: https
+  filters: []
+  # Optional rule timeouts, for example {request: 3600s, backendRequest: 3600s}.
+  timeouts: {}
+
+# Persistent storage for /data. Each StatefulSet pod gets its own volume, which
+# is what makes replica.id stable across restarts and reschedules.
+persistence:
+  enabled: true
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Passed to `twist wormhole-mailbox`. The database URLs are assembled from the
+# `database` section at container start-up and exported as WORMHOLE_* environment
+# variables; the password is never rendered into the pod spec or process argv.
+config:
+  # Address the server listens on inside the pod. Keep the port in sync with
+  # service.port (the container port is named "ws" and is fixed at 4000).
+  port: "tcp:4000:interface=0.0.0.0"
+  # Must be on persistent storage so the same replica identity is reused.
+  replicaIdFile: /data/replica.id
+  # auto: PostgreSQL uses LISTEN/NOTIFY, SQLite/MySQL stay local.
+  # Other values: local, postgres, redis://..., kafka://...
+  pubsub: auto
+  allowList: true
+  # Optional values; empty strings mean "do not pass the flag".
+  blurUsage: ""
+  generationDuration: ""
+  advertiseVersion: ""
+  signalError: ""
+  motd: ""
+  # Each entry is passed as --websocket-protocol-option=KEY=JSON.
+  websocketProtocolOptions: []
+  usageDb:
+    enabled: true
+  addridDb:
+    enabled: true
+  # Literal extra CLI arguments appended after the chart-generated ones.
+  extraArgs: []
+
+# Database connection settings.
+#
+# By default the bundled PostgreSQL subchart is used:
+#   host:     <release>-postgresql
+#   username: postgresql.auth.username
+#   channel:  postgresql.auth.database
+#   usage:    wormhole_usage  (created by the initdb script below)
+#   addrid:   wormhole_addrid (created by the initdb script below)
+#
+# To use an external database, disable the subchart and either provide a
+# password through `database.password` (the chart creates a Secret) or point
+# `database.existingSecret` at a Secret containing `existingSecretKey`.
+#
+# Changing postgresql.auth.username/database for the bundled subchart requires
+# updating postgresql.primary.initdb.scripts and the database.*Name values so
+# that all three databases exist and belong to the connecting user.
+database:
+  # Empty means "use the bundled PostgreSQL Service".
+  host: ""
+  port: 5432
+  # Empty means "use postgresql.auth.username".
+  username: ""
+  # Used only when postgresql.enabled=false and existingSecret is empty; the
+  # chart then creates a Secret. Prefer database.existingSecret in production.
+  password: ""
+  # SQLAlchemy URL scheme. Use mysql+pymysql:// for MariaDB/MySQL.
+  scheme: "postgresql+psycopg"
+  # Empty adds no query string. Example: require
+  sslmode: ""
+  channelName: wormhole
+  usageName: wormhole_usage
+  addridName: wormhole_addrid
+  existingSecret: ""
+  existingSecretKey: password
+
+# Bundled PostgreSQL. The app creates its own Alembic tables in the channel,
+# usage, and address-id databases; this subchart only provides the engine.
+postgresql:
+  enabled: true
+  fullnameOverride: ""
+  auth:
+    username: wormhole
+    database: wormhole
+    # Leave empty to let the subchart generate and store a password.
+    password: ""
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+  primary:
+    initdb:
+      # The mailbox server keeps channel, usage, and address-id state in
+      # separate databases because they share table names.
+      scripts:
+        10-wormhole-databases.sql: |
+          CREATE DATABASE "wormhole_usage" OWNER "wormhole";
+          CREATE DATABASE "wormhole_addrid" OWNER "wormhole";
+  persistence:
+    enabled: true
+    size: 8Gi
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # Set to a number to also scale on memory; empty disables it.
+  targetMemoryUtilizationPercentage: ""
+  behavior: {}
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Leave empty to get a preferred anti-affinity rule across nodes. Set a value
+# to replace it entirely (for example, a required rule or a nodeAffinity).
+affinity: {}
+
+nodeSelector: {}
+tolerations: []
+topologySpreadConstraints: []
+
+# Preferred over CPU limits for latency-sensitive event loops.
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 2
+    timeoutSeconds: 2
+  readiness:
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+  liveness:
+    periodSeconds: 20
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+terminationGracePeriodSeconds: 30
+
+# Optional network policy. Disabled by default because the required egress
+# targets depend on where your database and pub/sub backend live.
+networkPolicy:
+  enabled: false
+  # Set these to replace the defaults (ingress on the service port; egress to
+  # DNS and database.port). Add Redis/Kafka ports here when using them.
+  ingress: []
+  egress: []
+
+# Requires a Prometheus Operator CRD and a metrics endpoint. The mailbox
+# server does not expose Prometheus metrics on its own, so this stays off.
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  relabelings: []
+  metricRelabelings: []

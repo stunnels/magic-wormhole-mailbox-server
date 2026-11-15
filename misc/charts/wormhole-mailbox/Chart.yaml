@@ -1,0 +1,19 @@
+apiVersion: v2
+name: wormhole-mailbox
+description: Magic-Wormhole mailbox server (WebSocket relay) for horizontal scaling
+type: application
+version: 0.1.0
+appVersion: "0.8.0"
+kubeVersion: ">=1.25.0-0"
+home: https://magic-wormhole.readthedocs.io/en/latest/
+# Magic-Wormhole logo (MIT), served from the project documentation.
+icon: https://magic-wormhole.readthedocs.io/en/latest/_static/wormhole.png
+sources:
+  - https://github.com/magic-wormhole/magic-wormhole-mailbox-server
+annotations:
+  category: Infrastructure
+dependencies:
+  - name: postgresql
+    version: 18.12.18
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: postgresql.enabled

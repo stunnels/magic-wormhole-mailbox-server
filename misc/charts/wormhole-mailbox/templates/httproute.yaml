@@ -1,0 +1,40 @@
+{{- if .Values.gatewayAPI.enabled }}
+{{- if not .Values.gatewayAPI.parentRefs }}
+{{- fail "gatewayAPI.parentRefs must list at least one Gateway when gatewayAPI.enabled is true" }}
+{{- end }}
+{{- $fullName := include "wormhole-mailbox.fullname" . }}
+{{- $labels := mergeOverwrite (dict) (include "wormhole-mailbox.labels" . | fromYaml) .Values.gatewayAPI.labels }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- toYaml $labels | nindent 4 }}
+  {{- with .Values.gatewayAPI.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- toYaml .Values.gatewayAPI.parentRefs | nindent 4 }}
+  {{- with .Values.gatewayAPI.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: {{ .Values.gatewayAPI.pathType | default "PathPrefix" }}
+            value: {{ .Values.gatewayAPI.path | default "/" }}
+      {{- with .Values.gatewayAPI.filters }}
+      filters:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.gatewayAPI.timeouts }}
+      timeouts:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      backendRefs:
+        - name: {{ $fullName }}
+          port: {{ .Values.service.port }}
+{{- end }}

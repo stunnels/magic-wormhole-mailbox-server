@@ -1,0 +1,196 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "wormhole-mailbox.fullname" . }}
+  labels:
+    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "wormhole-mailbox.fullname" . }}-headless
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "wormhole-mailbox.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "wormhole-mailbox.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "wormhole-mailbox.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      containers:
+        - name: mailbox
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /scripts/entrypoint.sh
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: ws
+              containerPort: 4000
+              protocol: TCP
+          env:
+            - name: DB_SCHEME
+              value: {{ .Values.database.scheme | quote }}
+            - name: DB_HOST
+              value: {{ include "wormhole-mailbox.database.host" . | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_USER
+              value: {{ include "wormhole-mailbox.database.username" . | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "wormhole-mailbox.database.secretName" . }}
+                  key: {{ include "wormhole-mailbox.database.secretKey" . }}
+            - name: DB_SSLMODE
+              value: {{ .Values.database.sslmode | quote }}
+            - name: DB_CHANNEL_NAME
+              value: {{ .Values.database.channelName | quote }}
+            {{- if .Values.config.usageDb.enabled }}
+            - name: DB_USAGE_NAME
+              value: {{ .Values.database.usageName | quote }}
+            {{- else }}
+            - name: DB_USAGE_NAME
+              value: ""
+            {{- end }}
+            {{- if .Values.config.addridDb.enabled }}
+            - name: DB_ADDRID_NAME
+              value: {{ .Values.database.addridName | quote }}
+            {{- else }}
+            - name: DB_ADDRID_NAME
+              value: ""
+            {{- end }}
+            - name: LISTEN_ENDPOINT
+              value: {{ .Values.config.port | quote }}
+            - name: REPLICA_ID_FILE
+              value: {{ .Values.config.replicaIdFile | quote }}
+            - name: PUBSUB
+              value: {{ .Values.config.pubsub | quote }}
+            - name: ALLOW_LIST
+              value: {{ .Values.config.allowList | quote }}
+            - name: BLUR_USAGE
+              value: {{ .Values.config.blurUsage | quote }}
+            - name: GENERATION_DURATION
+              value: {{ .Values.config.generationDuration | quote }}
+            - name: ADVERTISE_VERSION
+              value: {{ .Values.config.advertiseVersion | quote }}
+            - name: SIGNAL_ERROR
+              value: {{ .Values.config.signalError | quote }}
+            - name: MOTD
+              value: {{ .Values.config.motd | quote }}
+            {{- with .Values.config.websocketProtocolOptions }}
+            - name: WEBSOCKET_PROTOCOL_OPTIONS
+              value: |
+                {{- range . }}
+                {{ . }}
+                {{- end }}
+            {{- end }}
+          {{- with .Values.extraEnv }}
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          startupProbe:
+            tcpSocket:
+              port: ws
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+          readinessProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          livenessProbe:
+            tcpSocket:
+              port: ws
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: entrypoint
+              mountPath: /scripts/entrypoint.sh
+              subPath: entrypoint.sh
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      {{- if .Values.affinity }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "wormhole-mailbox.selectorLabels" . | nindent 20 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: entrypoint
+          configMap:
+            name: {{ include "wormhole-mailbox.fullname" . }}-entrypoint
+            defaultMode: 0555
+        - name: tmp
+          emptyDir: {}
+        {{- if not .Values.persistence.enabled }}
+        - name: data
+          emptyDir: {}
+        {{- end }}
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "wormhole-mailbox.selectorLabels" . | nindent 10 }}
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          {{- toYaml .Values.persistence.accessModes | nindent 10 }}
+        {{- with .Values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

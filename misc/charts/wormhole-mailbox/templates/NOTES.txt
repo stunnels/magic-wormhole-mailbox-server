@@ -1,0 +1,50 @@
+{{- $fullName := include "wormhole-mailbox.fullname" . -}}
+Magic-Wormhole mailbox server installed.
+
+{{- if and .Values.ingress.enabled .Values.ingress.hosts }}
+Relay endpoint (once the host resolves and the ingress controller is ready):
+
+  wss://{{ (first .Values.ingress.hosts).host }}/v1
+
+Point clients at it with:
+
+  wormhole --relay-url=wss://{{ (first .Values.ingress.hosts).host }}/v1 send FILE
+{{- else if and .Values.gatewayAPI.enabled .Values.gatewayAPI.hostnames }}
+Relay endpoint (once the host resolves and the Gateway accepts the HTTPRoute):
+
+  wss://{{ first .Values.gatewayAPI.hostnames }}/v1
+
+Point clients at it with:
+
+  wormhole --relay-url=wss://{{ first .Values.gatewayAPI.hostnames }}/v1 send FILE
+{{- else }}
+Relay endpoint inside the cluster:
+
+  ws://{{ $fullName }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}/v1
+
+For clients outside the cluster, set service.type to LoadBalancer or enable
+ingress.enabled or gatewayAPI.enabled with a real host.
+{{- end }}
+
+Replica identity:
+  Each StatefulSet pod keeps /data/replica.id on its own PersistentVolume, so
+  this replica id survives restarts. The same id is used by the usage and
+  channel databases. Do not point several pods at the same volume.
+
+Database:
+  {{- if .Values.postgresql.enabled }}
+  Bundled PostgreSQL: {{ include "wormhole-mailbox.postgresql.fullname" . }}.
+  Databases: {{ .Values.database.channelName }}, {{ .Values.database.usageName }},
+  {{ .Values.database.addridName }}.
+  {{- else }}
+  External database: {{ include "wormhole-mailbox.database.host" . }}:{{ .Values.database.port }}.
+  Make sure the three databases exist before the pods start.
+  {{- end }}
+
+{{- if .Values.autoscaling.enabled }}
+
+The HPA manages the StatefulSet between {{ .Values.autoscaling.minReplicas }} and
+{{ .Values.autoscaling.maxReplicas }} replicas. Scaling down leaves the pods'
+PersistentVolumeClaims in place; delete them manually if that storage is no
+longer needed.
+{{- end }}

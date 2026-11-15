@@ -136,14 +136,14 @@ wormhole --relay-url=ws://localhost:4000/v1 send FILENAME
 
 ## Kubernetes (Helm)
 
-`misc/helm/wormhole-mailbox` packages the server as a StatefulSet for
+`misc/charts/wormhole-mailbox` packages the server as a StatefulSet for
 horizontally scaled deployments. It bundles PostgreSQL, keeps a persistent
 `replica.id` per pod, and includes an HPA, PodDisruptionBudget, and an Ingress
-example. See the [chart README](misc/helm/wormhole-mailbox/README.md).
+example. See the [chart README](misc/charts/wormhole-mailbox/README.md).
 
 ```shell
-helm dependency build misc/helm/wormhole-mailbox
-helm install my-relay misc/helm/wormhole-mailbox \
+helm dependency build misc/charts/wormhole-mailbox
+helm install my-relay misc/charts/wormhole-mailbox \
   --namespace wormhole --create-namespace \
   --set image.repository=registry.example.com/magic-wormhole-mailbox \
   --set image.tag=0.8.0 \

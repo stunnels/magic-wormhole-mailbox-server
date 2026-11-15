@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wormhole-mailbox.fullname" . }}
+  labels:
+    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - name: ws
+      port: {{ .Values.service.port }}
+      targetPort: ws
+      protocol: TCP
+      appProtocol: kubernetes.io/ws
+  selector:
+    {{- include "wormhole-mailbox.selectorLabels" . | nindent 4 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "wormhole-mailbox.fullname" . }}-headless
+  labels:
+    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    - name: ws
+      port: {{ .Values.service.port }}
+      targetPort: ws
+      protocol: TCP
+  selector:
+    {{- include "wormhole-mailbox.selectorLabels" . | nindent 4 }}
