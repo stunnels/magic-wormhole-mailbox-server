@@ -124,8 +124,9 @@ persistence:
 # `database` section at container start-up and exported as WORMHOLE_* environment
 # variables; the password is never rendered into the pod spec or process argv.
 config:
-  # Address the server listens on inside the pod. Keep the port in sync with
-  # service.port (the container port is named "ws" and is fixed at 4000).
+  # Address the server listens on inside the pod. The port must be 4000: the
+  # StatefulSet's container port is fixed at 4000 and the Service targets it by
+  # the name "ws". service.port is the ClusterIP port and may differ.
   port: "tcp:4000:interface=0.0.0.0"
   # Must be on persistent storage so the same replica identity is reused.
   replicaIdFile: /data/replica.id

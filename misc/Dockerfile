@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Build a wheel in a throwaway stage so the runtime image has no build tools
-# or pip cache.
+# Build a self-contained virtualenv in a throwaway stage so the runtime image
+# has no build tools and nothing is pip-installed into the system Python.
 ARG PYTHON_VERSION=3.12
 FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 
@@ -10,14 +10,16 @@ ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
 
 WORKDIR /build
 COPY . .
-RUN python -m pip wheel --no-cache-dir --wheel-dir /wheels '.[backends]'
+RUN python -m venv /venv \
+ && /venv/bin/pip install --no-cache-dir '.[backends]'
 
 
 FROM python:${PYTHON_VERSION}-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    VIRTUAL_ENV=/venv \
+    PATH="/venv/bin:$PATH" \
     WORMHOLE_CHANNEL_DB=/data/relay.sqlite \
     WORMHOLE_USAGE_DB=/data/usage.sqlite
 
@@ -27,11 +29,13 @@ RUN groupadd --system --gid 10001 wormhole \
         --uid 10001 --gid wormhole wormhole \
  && install -d --owner wormhole --group wormhole /data
 
-COPY --from=builder /wheels /wheels
-RUN python -m pip install --no-cache-dir --no-index \
-        --find-links=/wheels 'magic-wormhole-mailbox-server[backends]' \
- && rm -rf /wheels \
- && python -c "import psycopg, pymysql, redis, confluent_kafka" \
+# The interpreter and dependencies come from the builder's venv; the runtime
+# stage never runs pip.
+COPY --from=builder /venv /venv
+
+# Twisted rewrites its plugin cache on first use, so let the runtime user own
+# that one file rather than the whole venv.
+RUN python -c "import psycopg, pymysql, redis, confluent_kafka" \
  && python -c "import twisted.plugins; \
 from twisted.plugin import getPlugins; \
 from twisted.application.service import IServiceMaker; \

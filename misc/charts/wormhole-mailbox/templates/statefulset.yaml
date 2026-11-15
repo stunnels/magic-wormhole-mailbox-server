@@ -1,3 +1,9 @@
+{{- /* The container port is part of the Service contract: the Service targets
+       the named port "ws", so the server must actually listen there too. */}}
+{{- $containerPort := 4000 }}
+{{- if not (regexMatch (printf "^tcp:%d(:.*)?$" $containerPort) .Values.config.port) }}
+{{- fail (printf "config.port must listen on the container port %d (e.g. \"tcp:%d:interface=0.0.0.0\"), got %q" $containerPort $containerPort .Values.config.port) }}
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -46,7 +52,7 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
             - name: ws
-              containerPort: 4000
+              containerPort: {{ $containerPort }}
               protocol: TCP
           env:
             - name: DB_SCHEME
