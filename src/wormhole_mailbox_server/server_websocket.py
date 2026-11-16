@@ -112,6 +112,8 @@ class WebSocketServer(websocket.WebSocketServerProtocol):
         self._mailbox_id = None
         self._did_close = False
         self._peer_addr_port = None
+        # Set by _onConnect; onClose can run first if the handshake fails.
+        self._connection_tracker = None
 
     def onConnect(self, request):
         # Exceptions in onConnect are caught by autobahn, which logs
@@ -127,35 +129,8 @@ class WebSocketServer(websocket.WebSocketServerProtocol):
 
     def _onConnect(self, request):
         rv = self.factory._server
-        # Caddy uses capitalized headers like X-Real-IP and X-Real-Port, which
-        # you see if you forward Caddy to netcat. But the twisted/autobahn
-        # Request object lowercases everything.
-        #
-        # We only use this for assistance in NAT hole-punching, so it
-        # doesn't matter if the client is able to inject their own
-        # headers and spoof somebody else's IP address, they're only
-        # hurting themselves
-        if "x-real-ip" in request.headers:
-            peer_host = request.headers.get("x-real-ip") # either 1.2.3.4 or 2600:..:1234
-            peer_port = request.headers.get("x-real-port")
-            # assume frontends like Caddy don't give us v4-in-v6 addrs
-            peer_type = "ipv6" if ":" in peer_host else "ipv4"
-        else:
-            peer = request.peer
-            peer_type = peer.split(":", maxsplit=1)[0]
-            peer_port = peer.rsplit(":", maxsplit=1)[-1]
-            peer_host = peer[len(peer_type)+1:(-len(peer_port)-1)]
-            # this gets me [tcp6, ::1, 53276] for a client using ws://localhost:4000/v1
-            #  or ws://[::1]:4000/v1
-            # and [tcp6, ::ffff:127.0.0.1, 53279] when using ws://127.0.0.1:4000/v1
-            if peer_type == "tcp6":
-                peer_type = "ipv6"
-                if peer_host.startswith("::ffff:"):
-                    peer_host = peer_host.rsplit(":", maxsplit=1)[-1]
-                    peer_type = "ipv4"
-            else:
-                peer_type = "ipv4"
-        self._peer_addr_port = (peer_type, peer_host, int(peer_port))
+        peer_type, peer_host, peer_port = self._get_peer(request)
+        self._peer_addr_port = (peer_type, peer_host, peer_port)
         # address_id is None if the address tracker is disabled (no --addrid-db=)
         address_id = self.factory._server.get_address_id(peer_type, peer_host)
         self._addr_id = address_id # for logging
@@ -169,6 +144,51 @@ class WebSocketServer(websocket.WebSocketServerProtocol):
         # can return (name, dict) or name here, where name is
         # WebSocket subprotocol name and dict is extra headers (if
         # provided) to send
+
+    def _get_peer(self, request):
+        """
+        Return (peer_type, peer_host, peer_port) for the client.
+
+        Caddy uses capitalized headers like X-Real-IP and X-Real-Port, which
+        you see if you forward Caddy to netcat. But the twisted/autobahn
+        Request object lowercases everything.
+
+        Some proxies set X-Real-IP but not X-Real-Port, and either header may
+        be malformed. In that case fall back to the transport peer instead of
+        failing the handshake (which autobahn turns into an HTTP 500).
+
+        We only use this for assistance in NAT hole-punching, so it doesn't
+        matter if the client is able to inject their own headers and spoof
+        somebody else's IP address, they're only hurting themselves.
+        """
+        forwarded_host = request.headers.get("x-real-ip")
+        forwarded_port = request.headers.get("x-real-port")
+        if forwarded_host and forwarded_port is not None:
+            try:
+                port = int(forwarded_port)
+            except (TypeError, ValueError):
+                pass
+            else:
+                if 0 < port < 65536:
+                    # assume frontends like Caddy don't give us v4-in-v6 addrs
+                    peer_type = "ipv6" if ":" in forwarded_host else "ipv4"
+                    return peer_type, forwarded_host, port
+
+        peer = request.peer
+        peer_type = peer.split(":", maxsplit=1)[0]
+        peer_port = peer.rsplit(":", maxsplit=1)[-1]
+        peer_host = peer[len(peer_type)+1:(-len(peer_port)-1)]
+        # this gets me [tcp6, ::1, 53276] for a client using ws://localhost:4000/v1
+        #  or ws://[::1]:4000/v1
+        # and [tcp6, ::ffff:127.0.0.1, 53279] when using ws://127.0.0.1:4000/v1
+        if peer_type == "tcp6":
+            peer_type = "ipv6"
+            if peer_host.startswith("::ffff:"):
+                peer_host = peer_host.rsplit(":", maxsplit=1)[-1]
+                peer_type = "ipv4"
+        else:
+            peer_type = "ipv4"
+        return peer_type, peer_host, int(peer_port)
 
     def get_your_address(self):
         (peer_type, peer_host, peer_port) = self._peer_addr_port
@@ -379,7 +399,11 @@ class WebSocketServer(websocket.WebSocketServerProtocol):
 
     def onClose(self, wasClean, code, reason):
         #log.msg("onClose", self, self._mailbox, self._listening)
-        self._connection_tracker.lost()
+        # onClose is also called when the handshake never completed, so the
+        # tracker may not exist. Clear it to keep duplicate closes harmless.
+        if self._connection_tracker is not None:
+            self._connection_tracker.lost()
+            self._connection_tracker = None
         if self._mailbox and self._listening:
             self._mailbox.remove_listener(self)
 

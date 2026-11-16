@@ -58,5 +58,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # `twist` is Twisted's application runner; it installs SIGTERM/SIGINT
 # handlers and runs in the foreground, so it is the correct PID 1 here.
-ENTRYPOINT ["twist", "wormhole-mailbox"]
-CMD ["--port=tcp:4000"]
+ENTRYPOINT ["twist", "wormhole-mailbox", "--port=tcp:4000"]

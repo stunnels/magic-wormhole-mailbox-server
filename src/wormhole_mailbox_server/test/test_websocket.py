@@ -33,6 +33,15 @@ class FakeServer:
         return c
 
 
+class FakeRequest:
+    """
+    Just enough of autobahn's Request object for WebSocketServer._onConnect.
+    """
+    def __init__(self, headers, peer):
+        self.headers = headers
+        self.peer = peer
+
+
 class WebSocket(unittest.TestCase):
     """
     Details of the server WebSocket protocol
@@ -191,3 +200,37 @@ class WebSocket(unittest.TestCase):
                 "port": 54321,
             }
         )
+
+    def test_missing_forwarded_port(self):
+        """
+        A proxy may send x-real-ip without x-real-port. The handshake must
+        fall back to the socket peer instead of failing with a 500.
+        """
+        proto = self.create_server_protocol()
+        proto.onConnect(FakeRequest(
+            {"x-real-ip": "127.1.2.3"},
+            "tcp4:127.0.0.1:31337",
+        ))
+        self.assertEqual(proto._peer_addr_port, ("ipv4", "127.0.0.1", 31337))
+
+    def test_invalid_forwarded_port(self):
+        """
+        A non-numeric x-real-port must not crash the handshake either.
+        """
+        proto = self.create_server_protocol()
+        proto.onConnect(FakeRequest(
+            {"x-real-ip": "127.1.2.3", "x-real-port": "not-a-port"},
+            "tcp4:127.0.0.1:31337",
+        ))
+        self.assertEqual(proto._peer_addr_port, ("ipv4", "127.0.0.1", 31337))
+
+    def test_close_before_connect(self):
+        """
+        onClose can run without onConnect: autobahn closes connections
+        whose handshake never completed (for example a plain HTTP request
+        to the WebSocket resource). It must not touch state that only
+        onConnect would have created.
+        """
+        proto = self.create_server_protocol()
+        # Must not raise AttributeError for the never-initialised tracker.
+        proto.onClose(True, 1000, "")
