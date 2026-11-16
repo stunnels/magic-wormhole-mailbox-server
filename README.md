@@ -86,7 +86,7 @@ Kafka (`confluent-kafka`).
 Build:
 
 ```shell
-docker build -f misc/Dockerfile -t magic-wormhole-mailbox .
+docker build -f misc/Dockerfile -t magic-wormhole-mailbox-server .
 ```
 
 Run (the named volume persists `relay.sqlite` and `usage.sqlite`):
@@ -95,7 +95,7 @@ Run (the named volume persists `relay.sqlite` and `usage.sqlite`):
 docker run -d --name wormhole-mailbox \
   -p 4000:4000 \
   -v wormhole-mailbox-data:/data \
-  magic-wormhole-mailbox
+  magic-wormhole-mailbox-server
 ```
 
 The container entrypoint is `twist wormhole-mailbox`. Database locations come
@@ -124,7 +124,7 @@ docker run -d --name wormhole-mailbox \
   -e WORMHOLE_CHANNEL_DB=/data/relay.sqlite \
   -e WORMHOLE_USAGE_DB= \
   -e WORMHOLE_ADDRID_DB=/data/addrid.sqlite \
-  magic-wormhole-mailbox
+  magic-wormhole-mailbox-server
 ```
 
 The image exposes port `4000` and includes a TCP healthcheck. Client
@@ -136,16 +136,17 @@ wormhole --relay-url=ws://localhost:4000/v1 send FILENAME
 
 ## Kubernetes (Helm)
 
-`misc/charts/wormhole-mailbox` packages the server as a StatefulSet for
-horizontally scaled deployments. It bundles PostgreSQL, keeps a persistent
+`misc/charts/magic-wormhole-mailbox-server` packages the server as a StatefulSet
+for horizontally scaled deployments. It bundles PostgreSQL, keeps a persistent
 `replica.id` per pod, and includes an HPA, PodDisruptionBudget, and an Ingress
-example. See the [chart README](misc/charts/wormhole-mailbox/README.md).
+example. See the
+[chart README](misc/charts/magic-wormhole-mailbox-server/README.md).
 
 ```shell
-helm dependency build misc/charts/wormhole-mailbox
-helm install my-relay misc/charts/wormhole-mailbox \
+helm dependency build misc/charts/magic-wormhole-mailbox-server
+helm install my-relay misc/charts/magic-wormhole-mailbox-server \
   --namespace wormhole --create-namespace \
-  --set image.repository=registry.example.com/magic-wormhole-mailbox \
+  --set image.repository=registry.example.com/magic-wormhole-mailbox-server \
   --set image.tag=0.8.0 \
   --set ingress.hosts[0].host=mailbox.example.com
 ```

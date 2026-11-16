@@ -1,5 +1,5 @@
 apiVersion: v2
-name: wormhole-mailbox
+name: magic-wormhole-mailbox-server
 description: Magic-Wormhole mailbox server (WebSocket relay) for horizontal scaling
 type: application
 version: 0.1.0

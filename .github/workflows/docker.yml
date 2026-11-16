@@ -16,13 +16,16 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/stunnels/magic-wormhole-mailbox
+  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # versioneer derives the version from git tags.
+          fetch-depth: 0
 
       - uses: docker/setup-qemu-action@v4.4.0
 
@@ -35,6 +38,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute version tag
+        id: version
+        run: |
+          version=$(python3 -c "import versioneer; print(versioneer.get_version())")
+          # Docker tags allow only [A-Za-z0-9_.-], so versioneer's "+" is
+          # rewritten as "-".
+          version=${version//+/-}
+          echo "tag=${version}" >> "$GITHUB_OUTPUT"
+          echo "Using tag ${version}"
+
       - name: Derive image tags
         id: meta
         uses: docker/metadata-action@v6.2.0
@@ -44,6 +57,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.tag }}
             type=sha
 
       - name: Build and push

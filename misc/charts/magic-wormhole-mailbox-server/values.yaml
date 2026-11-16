@@ -1,4 +1,4 @@
-# Default values for the wormhole-mailbox chart.
+# Default values for the magic-wormhole-mailbox-server chart.
 #
 # The chart is production-shaped: it runs three replicas behind an HPA, keeps a
 # PersistentVolume per pod for the server's persistent replica.id, and bundles
@@ -9,9 +9,9 @@
 replicaCount: 3
 
 image:
-  # Build with: docker build -f misc/Dockerfile -t magic-wormhole-mailbox .
+  # Build with: docker build -f misc/Dockerfile -t magic-wormhole-mailbox-server .
   # Then push to your registry and override repository/tag.
-  repository: magic-wormhole-mailbox
+  repository: magic-wormhole-mailbox-server
   tag: latest
   pullPolicy: IfNotPresent
 

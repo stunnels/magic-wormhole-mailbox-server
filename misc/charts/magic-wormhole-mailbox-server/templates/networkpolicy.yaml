@@ -2,13 +2,13 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "wormhole-mailbox.fullname" . }}
+  name: {{ include "magic-wormhole-mailbox-server.fullname" . }}
   labels:
-    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+    {{- include "magic-wormhole-mailbox-server.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      {{- include "wormhole-mailbox.selectorLabels" . | nindent 6 }}
+      {{- include "magic-wormhole-mailbox-server.selectorLabels" . | nindent 6 }}
   policyTypes:
     - Ingress
     - Egress

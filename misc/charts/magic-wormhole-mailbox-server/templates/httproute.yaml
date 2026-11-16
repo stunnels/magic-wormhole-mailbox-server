@@ -2,8 +2,8 @@
 {{- if not .Values.gatewayAPI.parentRefs }}
 {{- fail "gatewayAPI.parentRefs must list at least one Gateway when gatewayAPI.enabled is true" }}
 {{- end }}
-{{- $fullName := include "wormhole-mailbox.fullname" . }}
-{{- $labels := mergeOverwrite (dict) (include "wormhole-mailbox.labels" . | fromYaml) .Values.gatewayAPI.labels }}
+{{- $fullName := include "magic-wormhole-mailbox-server.fullname" . }}
+{{- $labels := mergeOverwrite (dict) (include "magic-wormhole-mailbox-server.labels" . | fromYaml) .Values.gatewayAPI.labels }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

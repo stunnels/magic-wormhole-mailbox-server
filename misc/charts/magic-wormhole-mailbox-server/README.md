@@ -1,4 +1,4 @@
-# wormhole-mailbox Helm chart
+# magic-wormhole-mailbox-server Helm chart
 
 Deploys the Magic-Wormhole mailbox server as a horizontally scalable
 StatefulSet. The chart bundles
@@ -9,8 +9,8 @@ PersistentVolume so the server's persistent `replica.id` survives restarts.
 ## Install
 
 ```shell
-helm dependency build misc/charts/wormhole-mailbox
-helm install my-relay misc/charts/wormhole-mailbox \
+helm dependency build misc/charts/magic-wormhole-mailbox-server
+helm install my-relay misc/charts/magic-wormhole-mailbox-server \
   --namespace wormhole --create-namespace
 ```
 
@@ -28,15 +28,15 @@ The chart does not publish an image. Build one from the repository root and
 push it to your registry:
 
 ```shell
-docker build -f misc/Dockerfile -t registry.example.com/magic-wormhole-mailbox:0.8.0 .
-docker push registry.example.com/magic-wormhole-mailbox:0.8.0
+docker build -f misc/Dockerfile -t registry.example.com/magic-wormhole-mailbox-server:0.8.0 .
+docker push registry.example.com/magic-wormhole-mailbox-server:0.8.0
 ```
 
 Then set:
 
 ```yaml
 image:
-  repository: registry.example.com/magic-wormhole-mailbox
+  repository: registry.example.com/magic-wormhole-mailbox-server
   tag: "0.8.0"
 ```
 

@@ -2,12 +2,12 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "wormhole-mailbox.fullname" . }}
+  name: {{ include "magic-wormhole-mailbox-server.fullname" . }}
   labels:
-    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+    {{- include "magic-wormhole-mailbox-server.labels" . | nindent 4 }}
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "wormhole-mailbox.selectorLabels" . | nindent 6 }}
+      {{- include "magic-wormhole-mailbox-server.selectorLabels" . | nindent 6 }}
 {{- end }}

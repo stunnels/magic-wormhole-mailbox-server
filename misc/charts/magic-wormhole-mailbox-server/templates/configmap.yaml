@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "wormhole-mailbox.fullname" . }}-entrypoint
+  name: {{ include "magic-wormhole-mailbox-server.fullname" . }}-entrypoint
   labels:
-    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+    {{- include "magic-wormhole-mailbox-server.labels" . | nindent 4 }}
 data:
   entrypoint.sh: |
     #!/bin/sh

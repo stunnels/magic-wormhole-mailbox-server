@@ -28,7 +28,7 @@ jobs:
         env:
           ORG: ${{ github.repository_owner }}
         run: |
-          CHART=wormhole-mailbox
+          CHART=magic-wormhole-mailbox-server
           helm dependency build "./misc/charts/$CHART"
           helm package "./misc/charts/$CHART"
           helm push "$CHART"-*.tgz "oci://ghcr.io/${ORG}/charts"

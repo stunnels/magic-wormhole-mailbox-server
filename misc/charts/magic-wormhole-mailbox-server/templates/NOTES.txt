@@ -1,4 +1,4 @@
-{{- $fullName := include "wormhole-mailbox.fullname" . -}}
+{{- $fullName := include "magic-wormhole-mailbox-server.fullname" . -}}
 Magic-Wormhole mailbox server installed.
 
 {{- if and .Values.ingress.enabled .Values.ingress.hosts }}
@@ -33,11 +33,11 @@ Replica identity:
 
 Database:
   {{- if .Values.postgresql.enabled }}
-  Bundled PostgreSQL: {{ include "wormhole-mailbox.postgresql.fullname" . }}.
+  Bundled PostgreSQL: {{ include "magic-wormhole-mailbox-server.postgresql.fullname" . }}.
   Databases: {{ .Values.database.channelName }}, {{ .Values.database.usageName }},
   {{ .Values.database.addridName }}.
   {{- else }}
-  External database: {{ include "wormhole-mailbox.database.host" . }}:{{ .Values.database.port }}.
+  External database: {{ include "magic-wormhole-mailbox-server.database.host" . }}:{{ .Values.database.port }}.
   Make sure the three databases exist before the pods start.
   {{- end }}
 

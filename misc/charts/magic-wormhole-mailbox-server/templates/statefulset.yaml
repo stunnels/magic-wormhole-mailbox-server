@@ -7,11 +7,11 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "wormhole-mailbox.fullname" . }}
+  name: {{ include "magic-wormhole-mailbox-server.fullname" . }}
   labels:
-    {{- include "wormhole-mailbox.labels" . | nindent 4 }}
+    {{- include "magic-wormhole-mailbox-server.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "wormhole-mailbox.fullname" . }}-headless
+  serviceName: {{ include "magic-wormhole-mailbox-server.fullname" . }}-headless
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
   {{- end }}
@@ -20,11 +20,11 @@ spec:
     type: RollingUpdate
   selector:
     matchLabels:
-      {{- include "wormhole-mailbox.selectorLabels" . | nindent 6 }}
+      {{- include "magic-wormhole-mailbox-server.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "wormhole-mailbox.labels" . | nindent 8 }}
+        {{- include "magic-wormhole-mailbox-server.labels" . | nindent 8 }}
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -34,7 +34,7 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
-      serviceAccountName: {{ include "wormhole-mailbox.serviceAccountName" . }}
+      serviceAccountName: {{ include "magic-wormhole-mailbox-server.serviceAccountName" . }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -58,16 +58,16 @@ spec:
             - name: DB_SCHEME
               value: {{ .Values.database.scheme | quote }}
             - name: DB_HOST
-              value: {{ include "wormhole-mailbox.database.host" . | quote }}
+              value: {{ include "magic-wormhole-mailbox-server.database.host" . | quote }}
             - name: DB_PORT
               value: {{ .Values.database.port | quote }}
             - name: DB_USER
-              value: {{ include "wormhole-mailbox.database.username" . | quote }}
+              value: {{ include "magic-wormhole-mailbox-server.database.username" . | quote }}
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "wormhole-mailbox.database.secretName" . }}
-                  key: {{ include "wormhole-mailbox.database.secretKey" . }}
+                  name: {{ include "magic-wormhole-mailbox-server.database.secretName" . }}
+                  key: {{ include "magic-wormhole-mailbox-server.database.secretKey" . }}
             - name: DB_SSLMODE
               value: {{ .Values.database.sslmode | quote }}
             - name: DB_CHANNEL_NAME
@@ -155,7 +155,7 @@ spec:
                 topologyKey: kubernetes.io/hostname
                 labelSelector:
                   matchLabels:
-                    {{- include "wormhole-mailbox.selectorLabels" . | nindent 20 }}
+                    {{- include "magic-wormhole-mailbox-server.selectorLabels" . | nindent 20 }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -172,7 +172,7 @@ spec:
       volumes:
         - name: entrypoint
           configMap:
-            name: {{ include "wormhole-mailbox.fullname" . }}-entrypoint
+            name: {{ include "magic-wormhole-mailbox-server.fullname" . }}-entrypoint
             defaultMode: 0555
         - name: tmp
           emptyDir: {}
@@ -185,7 +185,7 @@ spec:
     - metadata:
         name: data
         labels:
-          {{- include "wormhole-mailbox.selectorLabels" . | nindent 10 }}
+          {{- include "magic-wormhole-mailbox-server.selectorLabels" . | nindent 10 }}
         {{- with .Values.persistence.annotations }}
         annotations:
           {{- toYaml . | nindent 10 }}
